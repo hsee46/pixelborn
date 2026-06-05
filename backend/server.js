@@ -140,8 +140,7 @@ app.get('/success', (req, res) => {
 });
 
 // ─── DÉMARRAGE ───
-const PORT = process.env.PORT || 8080
-;
+const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, () => {
   console.log(`🚀 PixelWar server running on port ${PORT}`);
 });
