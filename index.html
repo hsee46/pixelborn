@@ -429,6 +429,8 @@ const COLORS = [
   '#aaaaaa','#555555','#000000','#ff99aa','#88ffcc'
 ];
 
+const BACKEND = 'https://pixelborn-production.up.railway.app';
+
 const pixels = new Uint32Array(TOTAL);
 let selectedColor = '#00f5ff';
 let zoom = 1, offsetX = 0, offsetY = 0;
@@ -558,7 +560,7 @@ function showToast(msg) {
   setTimeout(() => toastEl.classList.remove('show'), 2500);
 }
 
-function submitPayment() {
+async function submitPayment() {
   const num = document.getElementById('card-num').value.replace(/\s/g, '');
   const exp = document.getElementById('card-exp').value;
   const cvc = document.getElementById('card-cvc').value;
@@ -571,14 +573,32 @@ function submitPayment() {
   const btn = document.getElementById('btn-pay');
   btn.classList.add('loading');
   btn.textContent = '⏳ TRAITEMENT...';
-  setTimeout(() => {
-    if (pendingPixel) {
-      const { px, py } = pendingPixel;
-      paintPixel(px, py, selectedColor);
-      closeModal();
-      showToast('✓ PIXEL (' + px + ',' + py + ') ACQUIS !');
+  if (pendingPixel) {
+    const { px, py } = pendingPixel;
+    try {
+      const res = await fetch(BACKEND + '/api/pixels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: px, y: py, color: selectedColor })
+      });
+      if (res.ok) {
+        paintPixel(px, py, selectedColor);
+        closeModal();
+        showToast('✓ PIXEL (' + px + ',' + py + ') ACQUIS !');
+      } else if (res.status === 409) {
+        closeModal();
+        showToast('⚠ PIXEL DÉJÀ PRIS');
+      } else {
+        btn.classList.remove('loading');
+        btn.textContent = '⚡ PAYER 1,00 €';
+        showToast('⚠ ERREUR SERVEUR');
+      }
+    } catch (err) {
+      btn.classList.remove('loading');
+      btn.textContent = '⚡ PAYER 1,00 €';
+      showToast('⚠ CONNEXION IMPOSSIBLE');
     }
-  }, 1400);
+  }
 }
 
 document.getElementById('card-num').addEventListener('input', function(e) {
@@ -744,6 +764,22 @@ document.getElementById('custom-col').addEventListener('input', function(e) {
   selectedColor = e.target.value;
   document.querySelectorAll('.color-btn').forEach(function(x) { x.classList.remove('active'); });
 });
+
+// ─── CONNEXION BACKEND ───
+function connectWS() {
+  const wsUrl = BACKEND.replace('https://', 'wss://').replace('http://', 'ws://');
+  const ws = new WebSocket(wsUrl);
+  ws.onmessage = function(e) {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'init') {
+      msg.pixels.forEach(function(p) { paintPixel(p.x, p.y, p.color); });
+    } else if (msg.type === 'pixel') {
+      paintPixel(msg.x, msg.y, msg.color);
+    }
+  };
+  ws.onclose = function() { setTimeout(connectWS, 3000); };
+}
+connectWS();
 
 window.addEventListener('resize', resize);
 resize();
