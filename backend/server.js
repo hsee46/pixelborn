@@ -29,7 +29,7 @@ db.exec(`
 // ─── MIDDLEWARE ───
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(path.join(__dirname, '..')));
 
 // ─── WEBSOCKET (temps réel) ───
 const wss = new WebSocket.Server({ noServer: true });
